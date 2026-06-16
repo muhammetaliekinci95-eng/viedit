@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; media-src *; img-src * data: blob:;">
+<title>ViEdit — Türkçe Video Editör</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- Splash -->
+<div id="splash">
+  <div class="splash-inner">
+    <div class="splash-logo">✦ ViEdit</div>
+    <div class="splash-sub">Türkçe Video Editör</div>
+    <div class="splash-bar"><div class="splash-fill" id="splashFill"></div></div>
+    <div class="splash-msg" id="splashMsg">Başlatılıyor...</div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+
+<!-- Üst Araç Çubuğu -->
+<div class="toolbar">
+  <span class="logo">✦ ViEdit</span>
+  <div class="sep"></div>
+  <button class="tb" onclick="importMediaDialog()" title="Medya İçeri Aktar (Ctrl+I)">📁 İçeri Aktar</button>
+  <button class="tb" onclick="doUndo()" title="Geri Al (Ctrl+Z)">↩</button>
+  <button class="tb" onclick="doRedo()" title="Tekrar (Ctrl+Y)">↪</button>
+  <div class="sep"></div>
+  <button class="tb" onclick="setTool('seç',this)" id="tool_sec" title="Seç (V)">↖ Seç</button>
+  <button class="tb" onclick="setTool('kes',this)" id="tool_kes" title="Kes Bıçağı (C)">✂ Kes</button>
+  <button class="tb" onclick="setTool('kalem',this)" id="tool_kal" title="Kalem (P)">✎ Kalem</button>
+  <div class="sep"></div>
+  <button class="tb" onclick="splitClip()" title="Klip Böl (Ctrl+K)">⚡ Böl</button>
+  <button class="tb" onclick="delClip()" title="Sil">🗑 Sil</button>
+  <button class="tb" onclick="dupClip()" title="Kopyala">⧉ Kopyala</button>
+  <div class="sep"></div>
+  <span id="projName" class="proj-lbl">📄 Başlıksız Proje</span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <select id="resSelect" class="res-sel" title="Çözünürlük">
+      <option>1920×1080 (FHD)</option>
+      <option>3840×2160 (4K)</option>
+      <option>1280×720 (HD)</option>
+      <option>854×480 (SD)</option>
+      <option>1080×1920 (Dikey)</option>
+    </select>
+    <select id="fpsSelect" class="res-sel" title="Kare Hızı">
+      <option>24 FPS</option>
+      <option>25 FPS</option>
+      <option selected>30 FPS</option>
+      <option>60 FPS</option>
+    </select>
+    <button class="btn-export" onclick="exportDialog()">⬆ Dışa Aktar</button>
+  </div>
+</div>
+
+<!-- Ana Alan -->
+<div class="main-area">
+
+  <!-- Sol Panel -->
+  <div class="panel-left" id="panelLeft">
+    <div class="panel-tabs">
+      <button class="ptab active" onclick="switchTab('medya',this)">📁<br><span>Medya</span></button>
+      <button class="ptab" onclick="switchTab('efekt',this)">✨<br><span>Efektler</span></button>
+      <button class="ptab" onclick="switchTab('gecis',this)">🔀<br><span>Geçişler</span></button>
+      <button class="ptab" onclick="switchTab('metin',this)">T<br><span>Metin</span></button>
+      <button class="ptab" onclick="switchTab('renk',this)">🎨<br><span>Renkler</span></button>
+    </div>
+    <div class="panel-content" id="panelContent"></div>
+  </div>
+
+  <!-- Orta Önizleme -->
+  <div class="panel-center">
+    <div class="preview-container">
+      <div class="preview-box" id="previewBox">
+        <video id="mainVideo" style="display:none;width:100%;height:100%;object-fit:contain"></video>
+        <canvas id="previewCanvas" style="display:none;width:100%;height:100%"></canvas>
+        <div class="preview-inner" id="previewInner">
+          <div class="placeholder" id="placeholder">
+            <div style="font-size:64px">🎬</div>
+            <p>Medya dosyası ekleyin</p>
+            <p style="font-size:11px;color:#3a3a6a;margin-top:4px">Dosyaları buraya sürükleyin veya "İçeri Aktar" butonunu kullanın</p>
+          </div>
+          <div class="preview-bg" id="previewBg" style="display:none">
+            <div class="preview-color-bar">
+              <div style="background:#ff0000;flex:1"></div>
+              <div style="background:#00ff00;flex:1"></div>
+              <div style="background:#0000ff;flex:1"></div>
+              <div style="background:#ffff00;flex:1"></div>
+              <div style="background:#ff00ff;flex:1"></div>
+              <div style="background:#00ffff;flex:1"></div>
+            </div>
+            <div class="preview-label" id="previewLabel">🎬 Önizleme</div>
+          </div>
+        </div>
+        <div class="text-layer" id="textLayer"></div>
+
+        <!-- Oynatma Kontrolleri -->
+        <div class="ctrl-bar">
+          <div class="prog-wrap">
+            <div class="prog-bar" id="progBar" onclick="seekTo(event)">
+              <div class="prog-fill" id="progFill" style="width:0%"></div>
+              <div class="in-mark" id="inMark" style="left:0%;display:none"></div>
+              <div class="out-mark" id="outMark" style="left:100%;display:none"></div>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <button class="cb" onclick="goStart()" title="Başa Git [Home]">⏮</button>
+            <button class="cb" onclick="goBack()" title="1 Kare Geri [Sol]">⏪</button>
+            <button class="cb main" onclick="togglePlay()" id="playBtn" title="Oynat/Duraklat [Space]">▶</button>
+            <button class="cb" onclick="goFwd()" title="1 Kare İleri [Sağ]">⏩</button>
+            <button class="cb" onclick="goEnd()" title="Sona Git [End]">⏭</button>
+            <div class="vsep"></div>
+            <span class="time-dsp" id="timeDsp">00:00:00:00 / 00:02:00:00</span>
+            <div class="vsep"></div>
+            <button class="cb sm" onclick="markIn()" title="Giriş Noktası [I]">[ Gir</button>
+            <button class="cb sm" onclick="markOut()" title="Çıkış Noktası [O]">Çık ]</button>
+            <div class="vsep"></div>
+            <span style="font-size:12px">🔊</span>
+            <input type="range" id="volSlider" min="0" max="100" value="80" style="width:70px;accent-color:#7c3aed;cursor:pointer" title="Ses">
+            <select id="spdSel" class="sm-sel" onchange="setSpd(this.value)" title="Hız">
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+            <button class="cb" onclick="toggleLoop()" id="loopBtn" title="Döngü">🔁</button>
+            <button class="cb" onclick="toggleFS()" title="Tam Ekran [F11]" style="margin-left:auto">⛶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope / Historgram -->
+      <div class="scope-bar">
+        <div class="scope-item">
+          <div class="scope-lbl">Dalga Formu</div>
+          <canvas id="waveScope" width="120" height="50"></canvas>
+        </div>
+        <div class="scope-item">
+          <div class="scope-lbl">Historgram</div>
+          <canvas id="histScope" width="120" height="50"></canvas>
+        </div>
+        <div class="scope-item">
+          <div class="scope-lbl">VU Metre</div>
+          <canvas id="vuScope" width="60" height="50"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sağ Panel -->
+  <div class="panel-right" id="panelRight">
+    <div class="clip-card" id="clipCard">
+      <div class="cc-name" id="ccName">Klip Seçilmedi</div>
+      <div class="cc-meta" id="ccMeta">Zaman çizelgesinden bir klip seçin</div>
+    </div>
+
+    <div class="rtabs">
+      <button class="rtab active" onclick="switchRTab('renk',this)">🎨 Renk</button>
+      <button class="rtab" onclick="switchRTab('donustur',this)">🎬 Dönüş.</button>
+      <button class="rtab" onclick="switchRTab('ses',this)">🔊 Ses</button>
+      <button class="rtab" onclick="switchRTab('hiz',this)">⏱ Hız</button>
+    </div>
+    <div id="rightContent"></div>
+  </div>
+</div>
+
+<!-- Zaman Çizelgesi -->
+<div class="timeline">
+  <div class="tl-head">
+    <button class="tl-btn act" onclick="setTool('seç',this)" id="tlTool">↖ Seç</button>
+    <button class="tl-btn" onclick="addTrack('video')">+ Video Parçası</button>
+    <button class="tl-btn" onclick="addTrack('ses')">+ Ses Parçası</button>
+    <button class="tl-btn" onclick="addTrack('metin')">+ Metin Parçası</button>
+    <div class="vsep" style="margin:0 4px"></div>
+    <button class="tl-btn" onclick="markIn()">[ Giriş</button>
+    <button class="tl-btn" onclick="markOut()">] Çıkış</button>
+    <button class="tl-btn" onclick="splitClip()">⚡ Böl</button>
+    <button class="tl-btn" onclick="delClip()">🗑 Sil</button>
+    <button class="tl-btn" onclick="dupClip()">⧉ Kopyala</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <button class="zbtn" onclick="zoomTL(-1)">−</button>
+      <span class="zval" id="zoomV">100%</span>
+      <button class="zbtn" onclick="zoomTL(1)">+</button>
+      <input type="range" min="25" max="400" value="100" id="zoomSlider" style="width:80px;accent-color:#7c3aed;cursor:pointer" oninput="setZoom(this.value)">
+    </div>
+  </div>
+  <div class="tl-body">
+    <div class="tl-labels" id="tlLabels">
+      <div class="tl-ruler-placeholder"></div>
+    </div>
+    <div class="tl-tracks" id="tlTracks">
+      <div class="tl-ruler" id="ruler"></div>
+      <div class="track-rows" id="trackRows"></div>
+      <div class="playhead" id="playhead"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end app -->
+
+<!-- Kısayol Modal -->
+<div id="shortcutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+  <div style="background:#1a1a2e;border:1px solid #3d3d6e;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">
+    <h2 style="color:#a78bfa;margin-bottom:16px">⌨ Klavye Kısayolları</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      ${[
+        ['Space','Oynat / Duraklat'],['I','Giriş Noktası'],['O','Çıkış Noktası'],
+        ['Ctrl+K','Klip Böl'],['Delete','Klip Sil'],['Ctrl+D','Klip Kopyala'],
+        ['Ctrl+Z','Geri Al'],['Ctrl+Y','Tekrar'],['Ctrl+I','Medya İçeri Aktar'],
+        ['Ctrl+E','Dışa Aktar'],['Home','Başa Git'],['End','Sona Git'],
+        ['← →','5 Saniye İleri/Geri'],['F11','Tam Ekran'],['V','Seç Aracı'],
+        ['C','Kes Aracı'],['P','Kalem Aracı'],['Ctrl++/-','Zaman Çizelgesi Zoom']
+      ].map(([k,v])=>`<tr style="border-bottom:1px solid #2d2d5e"><td style="padding:6px 0;color:#a78bfa;font-family:monospace;font-weight:600">${k}</td><td style="padding:6px 0;color:#c0c0d0">${v}</td></tr>`).join('')}
+    </table>
+    <button onclick="document.getElementById('shortcutModal').style.display='none'" style="margin-top:16px;width:100%;padding:8px;background:#7c3aed;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:13px">Kapat</button>
+  </div>
+</div>
+
+<script src="renderer.js"></script>
+</body>
+</html>
