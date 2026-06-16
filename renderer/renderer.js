@@ -764,3 +764,140 @@ function toast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(() => { t.style.opacity = '0'; }, 2400);
 }
+
+// ─── EXPORT MODAL ─────────────────────────────────────────────────────────────
+function showExportModal() {
+  const existing = document.getElementById('exportModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'exportModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#1a1a2e;border:1px solid #3d3d6e;border-radius:12px;padding:28px;width:460px;max-width:95vw">
+      <h2 style="color:#a78bfa;margin-bottom:20px;font-size:16px">⬆ Video Dışa Aktar</h2>
+
+      <div style="display:grid;gap:12px;margin-bottom:20px">
+        <div>
+          <label style="font-size:11px;color:#6060a0;display:block;margin-bottom:4px">Çözünürlük</label>
+          <select id="expRes" style="width:100%;background:#1e1e40;border:1px solid #3d3d6e;border-radius:6px;color:#e0e0e0;padding:7px;font-size:12px">
+            <option value="1920x1080" selected>1920×1080 — Full HD (1080p)</option>
+            <option value="3840x2160">3840×2160 — Ultra HD (4K)</option>
+            <option value="1280x720">1280×720 — HD (720p)</option>
+            <option value="854x480">854×480 — SD (480p)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6060a0;display:block;margin-bottom:4px">Kare Hızı</label>
+          <select id="expFps" style="width:100%;background:#1e1e40;border:1px solid #3d3d6e;border-radius:6px;color:#e0e0e0;padding:7px;font-size:12px">
+            <option value="24">24 FPS — Sinema</option>
+            <option value="25">25 FPS — PAL</option>
+            <option value="30" selected>30 FPS — Standart</option>
+            <option value="60">60 FPS — Akıcı</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6060a0;display:block;margin-bottom:4px">Kalite</label>
+          <select id="expQuality" style="width:100%;background:#1e1e40;border:1px solid #3d3d6e;border-radius:6px;color:#e0e0e0;padding:7px;font-size:12px">
+            <option value="yüksek">Yüksek Kalite (büyük dosya)</option>
+            <option value="orta" selected>Orta Kalite (dengeli)</option>
+            <option value="düşük">Düşük Kalite (küçük dosya)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6060a0;display:block;margin-bottom:4px">Format</label>
+          <select id="expFormat" style="width:100%;background:#1e1e40;border:1px solid #3d3d6e;border-radius:6px;color:#e0e0e0;padding:7px;font-size:12px">
+            <option value="mp4" selected>MP4 — H.264 (Evrensel)</option>
+            <option value="webm">WebM — Web için</option>
+            <option value="gif">GIF — Animasyon</option>
+            <option value="mp3">MP3 — Yalnızca Ses</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- İlerleme çubuğu -->
+      <div id="expProgress" style="display:none;margin-bottom:16px">
+        <div style="font-size:11px;color:#7070a0;margin-bottom:6px" id="expProgressLbl">Render başlatılıyor...</div>
+        <div style="background:#252550;border-radius:4px;height:8px;overflow:hidden">
+          <div id="expProgressBar" style="height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);width:0%;transition:width 0.3s;border-radius:4px"></div>
+        </div>
+        <div style="font-size:10px;color:#5050a0;margin-top:4px" id="expProgressPct">%0</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button id="expStartBtn" onclick="startExport()" style="flex:1;padding:10px;background:#7c3aed;border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">🎬 Dışa Aktar</button>
+        <button onclick="document.getElementById('exportModal').remove()" style="padding:10px 16px;background:#1e1e40;border:1px solid #3d3d6e;border-radius:6px;color:#b0b0c0;font-size:12px;cursor:pointer">İptal</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function startExport() {
+  const res      = document.getElementById('expRes').value;
+  const fps      = document.getElementById('expFps').value;
+  const quality  = document.getElementById('expQuality').value;
+  const format   = document.getElementById('expFormat').value;
+
+  const result = await ipcRenderer.invoke('export-dialog', { defaultName: `viedit_cikti.${format}` });
+  if (result.canceled || !result.filePath) return;
+
+  // Zaman çizelgesindeki klipleri topla
+  const clips = [];
+  S.tracks.forEach(t => {
+    if (t.type === 'video') {
+      t.clips.forEach(c => { if (c.path) clips.push({ path: c.path, clipStart: c.start, dur: c.dur }); });
+    }
+  });
+
+  // İlerleme göster
+  document.getElementById('expProgress').style.display = 'block';
+  document.getElementById('expStartBtn').disabled = true;
+  document.getElementById('expStartBtn').textContent = '⏳ Render ediliyor...';
+
+  // İlerleme dinle
+  ipcRenderer.on('render-progress', (e, data) => {
+    document.getElementById('expProgressBar').style.width = data.percent + '%';
+    document.getElementById('expProgressPct').textContent = '%' + data.percent;
+    if (data.done) {
+      document.getElementById('expProgressLbl').textContent = '✅ Tamamlandı!';
+      document.getElementById('expProgressPct').textContent = '%100';
+    } else {
+      document.getElementById('expProgressLbl').textContent = `Render ediliyor... %${data.percent}`;
+    }
+  });
+
+  try {
+    const settings = { resolution: res, fps, quality,
+      brightness: +( document.getElementById('sB')  || {value:0}).value || 0,
+      contrast:   +( document.getElementById('sC')  || {value:0}).value || 0,
+      saturation: +( document.getElementById('sS')  || {value:0}).value || 0,
+      hue:        +( document.getElementById('sH')  || {value:0}).value || 0,
+      speed:      +( document.getElementById('sSpd')|| {value:100}).value / 100 || 1,
+    };
+
+    await ipcRenderer.invoke('render-video', { outputPath: result.filePath, clips, settings });
+
+    setTimeout(() => {
+      document.getElementById('exportModal').remove();
+      // Başarı bildirimi
+      const n = document.createElement('div');
+      n.style.cssText='position:fixed;bottom:230px;left:50%;transform:translateX(-50%);background:#1a4a2a;border:1px solid #2a8a4a;color:#4aff7a;padding:14px 24px;border-radius:10px;font-size:13px;z-index:9999;text-align:center';
+      n.innerHTML = `✅ Video başarıyla dışa aktarıldı!<br><span style="font-size:11px;color:#2a8a4a;cursor:pointer" onclick="ipcRenderer.invoke('show-in-folder','${result.filePath.replace(/\\/g,'/')}')">${result.filePath.split(/[\\/]/).pop()} — Klasörü Aç</span>`;
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 6000);
+    }, 1000);
+
+  } catch (err) {
+    document.getElementById('expProgressLbl').textContent = '❌ Hata: ' + err.message;
+    document.getElementById('expStartBtn').disabled = false;
+    document.getElementById('expStartBtn').textContent = '🎬 Tekrar Dene';
+  }
+}
+
+// Export butonunu override et
+function exportDialog() { showExportModal(); }
+
+// Menu'den export
+ipcRenderer.on('menu', (e, cmd) => {
+  if (cmd === 'export') showExportModal();
+});

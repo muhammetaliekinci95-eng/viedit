@@ -1,6 +1,6 @@
 {
   "name": "viedit",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "ViEdit - Türkçe Video Editör",
   "main": "main.js",
   "scripts": {
@@ -14,9 +14,7 @@
     "productName": "ViEdit",
     "copyright": "ViEdit 2026",
     "win": {
-      "target": [
-        { "target": "nsis", "arch": ["x64"] }
-      ],
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "assets/icon.ico"
     },
     "mac": {
@@ -35,20 +33,20 @@
       "createStartMenuShortcut": true,
       "shortcutName": "ViEdit",
       "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "language": "1055",
-      "multiLanguageInstaller": false,
-      "perMachine": false
+      "uninstallerIcon": "assets/icon.ico"
     },
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "renderer/**/*",
-      "assets/**/*",
-      "package.json"
-    ]
+    "extraResources": [
+      {
+        "from": "ffmpeg-bin/${os}",
+        "to": "ffmpeg",
+        "filter": ["**/*"]
+      }
+    ],
+    "directories": { "output": "dist" },
+    "files": ["main.js", "renderer/**/*", "assets/**/*", "package.json"]
+  },
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.3"
   },
   "devDependencies": {
     "electron": "^36.4.0",
